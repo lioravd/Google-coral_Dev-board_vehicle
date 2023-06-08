@@ -4,6 +4,7 @@ from periphery import GPIO
 from periphery import PWM
 
 import signal
+import sys
 import time
 import os
 
@@ -12,9 +13,8 @@ from wheel import Wheel
 from Vehicle import Vehicle
 from detect import detect
 
-
+import argparse
 # TODO: SHUTDOWN function
-
 
 def vehicle_init():
     """
@@ -50,57 +50,70 @@ def vehicle_init():
     return vehicle
 
 
-def follow_obj(objs, vehicle):
-    ### detect people
-    people = [obj for obj in objs if obj.id == 43]
+def follow_obj(objs, vehicle,c=43):
+    # detect people
+    fol_obj = [obj for obj in objs if obj.id == c]
     p_location = 0
     p_size = 0
 
-    ### get location of the first person
-    if people:
+    # get location of the first person
+    if fol_obj:
 
-        p = people[0]
+        p = fol_obj[0]
 
         p_location = (p.bbox.xmin + p.bbox.xmax - 300) / 2
         p_size = p.bbox.ymax - p.bbox.ymin
-        print(f'person at : {p_location}')
+        print(f'{object} at : {p_location}')
 
         if p_location > 60:
-            vehicle.turn(0.9)
+            vehicle.turn(0.8)
 
         elif p_location < -60:
-            vehicle.turn(-0.9)
+            vehicle.turn(-0.8)
 
         else:
             if p_size < 100:
-                vehicle.set_vel(-0.9)
+                vehicle.set_vel(-0.99)
 
             elif p_size > 150:
-                vehicle.set_vel(0.9)
+                vehicle.set_vel(0.99)
             else:
                 vehicle.stop()
-
     else:
         vehicle.stop()
 
 
-"""----------------------------------
-            Main
-------------------------------------"""
-vehicle = vehicle_init()
-"""----------------------------------
-define a safe-shutdown signal handler
-------------------------------------"""
+def main():
 
+    parser = argparse.ArgumentParser(description='Process some data.')
+    parser.add_argument('--headless', action='store_true',
+                        help='Run the program in headless mode (do not display output on monitor)')
 
-def sig_handler(SIG, FRAME):
-    vehicle.shutdown()
-    os.kill(os.getpid(), signal.SIGINT)
+    parser.add_argument('-c','--c',type=int,help='integerclass')
+    args = parser.parse_args()
+ 
+    if args.headless:
+        print("Running in headless mode...")
+    else:
+        print("Output will be displayed on the monitor.")
 
+    """----------------------------------
+                Main
+    ------------------------------------"""
+    vehicle = vehicle_init()
+    """----------------------------------
+    define a safe-shutdown signal handler
+    ------------------------------------"""
+    def sig_handler(SIG, FRAME):
+        vehicle.shutdown()
+        sys.exit(0)
+        print("killed softly")
+    signal.signal(signal.SIGINT, sig_handler)
 
-signal.signal(signal.SIGINT, sig_handler)
+    """----------------------------------
+    detection and driving the vehicle
+    ------------------------------------"""
+    detect(vehicle,c=args.c,user_fun= follow_obj, headless=args.headless)
 
-"""----------------------------------
-detection and driving the vehicle
-------------------------------------"""
-detect(vehicle, follow_obj)
+if __name__ == "__main__":
+    main()
